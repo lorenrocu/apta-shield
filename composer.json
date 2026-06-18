@@ -1,0 +1,18 @@
+{
+    "name": "apta/shield",
+    "description": "Premium WordPress security plugin with WAF, brute force protection, URL obfuscation, hybrid scanner, and core reinstallation.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Antigravity"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "AptaShield\\": "src/"
+        }
+    }
+}
