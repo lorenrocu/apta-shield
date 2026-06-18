@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace AptaShield\Modules\Scanner;
 

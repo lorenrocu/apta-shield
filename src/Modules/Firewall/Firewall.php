@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace AptaShield\Modules\Firewall;
 
@@ -61,12 +61,17 @@ class Firewall implements ModuleInterface {
 
         // Combine inputs to inspect.
         // We use wp_unslash to inspect raw inputs against regex patterns, but we sanitize them fully before logging.
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- We inspect raw inputs to detect attack patterns prior to blocking.
         $inputs = [
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Inspecting raw REQUEST_URI for attack patterns.
             'URI' => isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '',
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Inspecting raw QUERY_STRING for attack patterns.
             'GET' => isset($_SERVER['QUERY_STRING']) ? wp_unslash($_SERVER['QUERY_STRING']) : ''
         ];
         
+        // phpcs:ignore WordPress.Security.NonceVerification.Missing -- This is a WAF inspecting all POST requests globally, nonce verification does not apply.
         if (!empty($_POST)) {
+            // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Inspecting raw POST data in WAF.
             $inputs['POST'] = json_encode(wp_unslash($_POST));
         }
 

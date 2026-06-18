@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace AptaShield\Modules\UrlObfuscator;
 
@@ -60,6 +60,7 @@ class UrlObfuscator implements ModuleInterface {
             $redirect_url = site_url('wp-login.php');
             if (!empty($_SERVER['QUERY_STRING'])) {
                 $query_params = [];
+                // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- We parse the query string and then explicitly sanitize all keys and values in the loop below.
                 wp_parse_str(wp_unslash($_SERVER['QUERY_STRING']), $query_params);
                 // Sanitize keys and values safely
                 $sanitized_params = [];

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace AptaShield\Modules\Hardening;
 
@@ -116,6 +116,7 @@ class Hardening implements ModuleInterface {
             return;
         }
 
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Public GET query parameter check to detect/block author scan attempts.
         $author = isset($_GET['author']) ? sanitize_text_field(wp_unslash($_GET['author'])) : '';
         if ($author !== '' && is_numeric($author)) {
             $author_id = intval($author);

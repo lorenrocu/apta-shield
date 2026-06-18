@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // phpcs:ignoreFile
 /**
  * Standalone smoke test for AptaShield\Common\IpResolver.
