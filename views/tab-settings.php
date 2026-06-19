@@ -64,3 +64,17 @@ defined('ABSPATH') || exit;
         </div>
     </div>
 </div>
+
+<div class="apta-card">
+    <div class="card-header">
+        <h3><?php esc_html_e('Asistente de Configuración', 'apta-shield'); ?></h3>
+    </div>
+    <div class="card-body">
+        <p class="reinstall-description" style="margin-bottom: 16px;">
+            <?php esc_html_e('Si deseas volver a ejecutar el asistente de configuración inicial para configurar de forma guiada los módulos básicos, haz clic en el siguiente botón.', 'apta-shield'); ?>
+        </p>
+        <button type="button" id="apta-reset-wizard-btn" class="apta-btn apta-btn-secondary">
+            <span class="dashicons dashicons-update icon-btn"></span> <?php esc_html_e('Volver a ejecutar el Asistente', 'apta-shield'); ?>
+        </button>
+    </div>
+</div>

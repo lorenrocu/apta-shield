@@ -1,4 +1,4 @@
-﻿jQuery(document).ready(function($) {
+jQuery(document).ready(function($) {
     // State management
     let initialFormState = '';
     let isScanning = false;
@@ -14,6 +14,7 @@
     initAuditLogs();
     captureInitialFormState();
     initUrlPreview();
+    initWizard();
 
     // 1. Tabs Navigation
     function initTabs() {
@@ -493,6 +494,146 @@
             }
         }).fail(function() {
             $tbody.html('<tr><td colspan="5" style="text-align: center; color: var(--apta-danger);">Error al comunicar con el servidor.</td></tr>');
+        });
+    }
+
+    // 10. Onboarding Wizard Logic
+    function initWizard() {
+        // Reset Wizard click handler (always registered for settings page)
+        $('#apta-reset-wizard-btn').on('click', function() {
+            if (!confirm(aptaShield.messages.confirm_reset_wizard)) {
+                return;
+            }
+
+            const $btn = $(this);
+            $btn.prop('disabled', true).html('<span class="apta-spinner"></span> Reiniciando...');
+
+            $.post(aptaShield.ajax_url, {
+                action: 'apta_shield_reset_wizard',
+                nonce: aptaShield.nonce
+            }, function(response) {
+                if (response.success) {
+                    showToast(response.data, 'success');
+                    window.location.reload();
+                } else {
+                    showToast(response.data || aptaShield.messages.error, 'error');
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-update icon-btn"></span> Volver a ejecutar el Asistente');
+                }
+            }).fail(function() {
+                showToast(aptaShield.messages.error, 'error');
+                $btn.prop('disabled', false).html('<span class="dashicons dashicons-update icon-btn"></span> Volver a ejecutar el Asistente');
+            });
+        });
+
+        if (aptaShield.wizard_completed === 1) return;
+
+        let currentWizardStep = 1;
+
+        // Toggle obfuscator subfield
+        $('#wizard_url_obfuscator_enabled').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#wizard-obfuscator-sub').removeClass('hidden');
+            } else {
+                $('#wizard-obfuscator-sub').addClass('hidden');
+            }
+        });
+
+        // Toggle notifier subfield
+        $('#wizard_notifier_enabled').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#wizard-notifier-sub').removeClass('hidden');
+            } else {
+                $('#wizard-notifier-sub').addClass('hidden');
+            }
+        });
+
+        // Live slug cleaning
+        $('#wizard_url_slug').on('input', function() {
+            let val = $(this).val().toLowerCase().replace(/[^a-z0-9\-]/g, '');
+            $(this).val(val);
+        });
+
+        // Next button click
+        $('.btn-wizard-next').on('click', function() {
+            if (currentWizardStep === 2) {
+                // Validate custom login slug if enabled
+                if ($('#wizard_url_obfuscator_enabled').is(':checked') && !$('#wizard_url_slug').val().trim()) {
+                    showToast('Por favor, introduce un slug de acceso válido.', 'error');
+                    return;
+                }
+            }
+
+            goToStep(currentWizardStep + 1);
+        });
+
+        // Prev button click
+        $('.btn-wizard-prev').on('click', function() {
+            goToStep(currentWizardStep - 1);
+        });
+
+        function goToStep(step) {
+            // Hide current pane
+            $(`#wizard-step-${currentWizardStep}`).removeClass('active');
+            
+            // Update step indicator status
+            if (step > currentWizardStep) {
+                // Moving forward
+                $(`.step-indicator[data-step="${currentWizardStep}"]`).removeClass('active').addClass('completed');
+            } else {
+                // Moving backward
+                $(`.step-indicator[data-step="${currentWizardStep}"]`).removeClass('active');
+                $(`.step-indicator[data-step="${step}"]`).removeClass('completed');
+            }
+
+            currentWizardStep = step;
+
+            // Show new pane
+            $(`#wizard-step-${currentWizardStep}`).addClass('active');
+            $(`.step-indicator[data-step="${currentWizardStep}"]`).addClass('active');
+        }
+
+        // Complete Wizard button
+        $('#apta-wizard-complete-btn').on('click', function() {
+            const $btn = $(this);
+            const originalHtml = $btn.html();
+
+            // Validate notifier email
+            if ($('#wizard_notifier_enabled').is(':checked')) {
+                const emailVal = $('#wizard_notifier_email').val().trim();
+                if (!emailVal || !emailVal.includes('@')) {
+                    showToast('Por favor, introduce una dirección de correo válida.', 'error');
+                    return;
+                }
+            }
+
+            $btn.prop('disabled', true).html('<span class="apta-spinner"></span> Guardando...');
+
+            // Serialize only wizard options to prevent duplicate form fields from overwriting values
+            const formData = $('#apta-wizard-container :input').serialize() + '&action=apta_shield_complete_wizard&nonce=' + aptaShield.nonce;
+
+            $.post(aptaShield.ajax_url, formData, function(response) {
+                if (response.success) {
+                    // Update step indicators
+                    $(`.step-indicator[data-step="3"]`).removeClass('active').addClass('completed');
+                    
+                    // Show success step
+                    $(`#wizard-step-${currentWizardStep}`).removeClass('active');
+                    currentWizardStep = 'success';
+                    $(`#wizard-step-success`).addClass('active');
+                    showToast(response.data, 'success');
+                } else {
+                    showToast(response.data || aptaShield.messages.error, 'error');
+                    $btn.prop('disabled', false).html(originalHtml);
+                }
+            }).fail(function() {
+                showToast(aptaShield.messages.error, 'error');
+                $btn.prop('disabled', false).html(originalHtml);
+            });
+        });
+
+        // Enter dashboard button
+        $('#apta-wizard-enter-dashboard').on('click', function() {
+            window.location.reload();
         });
     }
 });

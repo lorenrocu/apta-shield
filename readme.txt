@@ -1,9 +1,9 @@
-﻿=== Apta Shield ===
+=== Apta Shield ===
 Contributors: megapattern, aptasec
 Tags: security, firewall, brute force, malware scanner, hardening
 Requires at least: 5.8
 Tested up to: 7.0
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -38,6 +38,9 @@ No. Apta Shield is built to be extremely lightweight and fast. The WAF rules run
 You can rename the plugin directory via FTP to disable it, which will restore the default login URL.
 
 == Upgrade Notice ==
+
+= 1.1.1 =
+Visual redesign, Onboarding Setup Wizard, login URL obfuscator warning fixes, and standard plugin check compliance updates.
 
 = 1.1.0 =
 Security and escaping enhancements for WordPress repository compliance.

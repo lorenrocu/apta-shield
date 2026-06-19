@@ -70,12 +70,12 @@ class Database {
         // Bans table SQL
         $sql_bans = "CREATE TABLE $bans_table (
             id bigint(20) NOT NULL AUTO_INCREMENT,
-            ip_address varchar(45) NOT NULL UNIQUE,
+            ip_address varchar(45) NOT NULL,
             reason varchar(100) DEFAULT NULL,
             banned_until datetime NOT NULL,
             created_at datetime NOT NULL,
             PRIMARY KEY  (id),
-            KEY ip_address (ip_address),
+            UNIQUE KEY  ip_address (ip_address),
             KEY banned_until (banned_until)
         ) $charset_collate;";
 

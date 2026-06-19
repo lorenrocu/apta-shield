@@ -44,6 +44,8 @@ class Dashboard {
         add_action('wp_ajax_apta_shield_unban_ip', [$this, 'ajax_unban_ip']);
         add_action('wp_ajax_apta_shield_get_audit_logs', [$this, 'ajax_get_audit_logs']);
         add_action('wp_ajax_apta_shield_clear_audit_logs', [$this, 'ajax_clear_audit_logs']);
+        add_action('wp_ajax_apta_shield_complete_wizard', [$this, 'ajax_complete_wizard']);
+        add_action('wp_ajax_apta_shield_reset_wizard', [$this, 'ajax_reset_wizard']);
     }
 
     /**
@@ -90,16 +92,19 @@ class Dashboard {
 
         // Localize Script
         wp_localize_script('apta-shield-admin-js', 'aptaShield', [
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce'    => wp_create_nonce('apta_shield_nonce'),
+            'ajax_url'         => admin_url('admin-ajax.php'),
+            'nonce'            => wp_create_nonce('apta_shield_nonce'),
+            'wizard_completed' => (int) get_option('apta_shield_wizard_completed', 0),
             'messages' => [
-                'saving'       => __('Guardando ajustes...', 'apta-shield'),
-                'saved'        => __('Ajustes guardados correctamente.', 'apta-shield'),
-                'error'        => __('Ocurrió un error inesperado.', 'apta-shield'),
-                'scan_started' => __('Iniciando escaneo...', 'apta-shield'),
-                'reinstalling' => __('Iniciando reinstalación del core...', 'apta-shield'),
-                'confirm_reinstall' => __('¿Estás seguro de que deseas reinstalar el núcleo de WordPress? Esto reemplazará los archivos del sistema, pero no tocará tus temas, plugins ni base de datos.', 'apta-shield'),
-                'confirm_clear_audit' => __('¿Estás seguro de que deseas vaciar todo el registro de actividad? Esta acción es irreversible.', 'apta-shield'),
+                'saving'               => __('Guardando ajustes...', 'apta-shield'),
+                'saved'                => __('Ajustes guardados correctamente.', 'apta-shield'),
+                'error'                => __('Ocurrió un error inesperado.', 'apta-shield'),
+                'scan_started'         => __('Iniciando escaneo...', 'apta-shield'),
+                'reinstalling'         => __('Iniciando reinstalación del core...', 'apta-shield'),
+                'confirm_reinstall'    => __('¿Estás seguro de que deseas reinstalar el núcleo de WordPress? Esto reemplazará los archivos del sistema, pero no tocará tus temas, plugins ni base de datos.', 'apta-shield'),
+                'confirm_clear_audit'  => __('¿Estás seguro de que deseas vaciar todo el registro de actividad? Esta acción es irreversible.', 'apta-shield'),
+                'wizard_saving'        => __('Guardando configuración inicial...', 'apta-shield'),
+                'confirm_reset_wizard' => __('¿Estás seguro de que deseas reiniciar el asistente de configuración? Volverás a la pantalla de bienvenida inicial.', 'apta-shield'),
             ]
         ]);
     }
@@ -162,10 +167,11 @@ class Dashboard {
         $merged_settings['trusted_proxies'] = IpResolver::get_trusted_proxies();
 
         if (update_option('apta_shield_settings', $merged_settings)) {
-            // Re-register rewrite rules if URL obfuscator settings changed
-            if ($current_settings['url_obfuscator_enabled'] !== $merged_settings['url_obfuscator_enabled'] ||
-                $current_settings['url_obfuscator_slug'] !== $merged_settings['url_obfuscator_slug']) {
-                flush_rewrite_rules();
+            // Re-register rewrite rules if URL obfuscator settings changed or force permalinks check
+            if ($merged_settings['url_obfuscator_enabled']) {
+                $this->enable_permalinks_and_flush();
+            } elseif ($current_settings['url_obfuscator_enabled'] !== $merged_settings['url_obfuscator_enabled']) {
+                flush_rewrite_rules(true);
             }
             wp_send_json_success(__('Ajustes guardados correctamente.', 'apta-shield'));
         }
@@ -327,5 +333,86 @@ class Dashboard {
         AuditLog::log('audit_cleared', __('Historial de auditoría vaciado por el administrador.', 'apta-shield'));
 
         wp_send_json_success(__('El registro de actividad ha sido vaciado.', 'apta-shield'));
+    }
+
+    /**
+     * AJAX handler to save onboarding wizard settings and mark it completed.
+     */
+    public function ajax_complete_wizard() {
+        check_ajax_referer('apta_shield_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('Permisos insuficientes.', 'apta-shield'), 403);
+        }
+
+        $current_settings = $this->plugin->get_settings();
+
+        // Parse inputs safely
+        $new_settings = [
+            'firewall_enabled'             => isset($_POST['firewall_enabled']) ? (bool)$_POST['firewall_enabled'] : false,
+            'brute_force_enabled'          => isset($_POST['brute_force_enabled']) ? (bool)$_POST['brute_force_enabled'] : false,
+            'brute_force_max_attempts'     => isset($_POST['brute_force_max_attempts']) ? max(1, intval($_POST['brute_force_max_attempts'])) : 5,
+            'brute_force_lockout_duration' => isset($_POST['brute_force_lockout_duration']) ? max(1, intval($_POST['brute_force_lockout_duration'])) : 60,
+            'url_obfuscator_enabled'       => isset($_POST['url_obfuscator_enabled']) ? (bool)$_POST['url_obfuscator_enabled'] : false,
+            'url_obfuscator_slug'          => isset($_POST['url_obfuscator_slug']) ? sanitize_title(wp_unslash($_POST['url_obfuscator_slug'])) : 'mi-login-secreto',
+            'scanner_auto_scan'            => isset($_POST['scanner_auto_scan']) ? (bool)$_POST['scanner_auto_scan'] : true,
+            'scanner_auto_recovery'        => isset($_POST['scanner_auto_recovery']) ? (bool)$_POST['scanner_auto_recovery'] : false,
+            'notifier_enabled'             => isset($_POST['notifier_enabled']) ? (bool)$_POST['notifier_enabled'] : false,
+            'notifier_email'               => isset($_POST['notifier_email']) ? sanitize_email(wp_unslash($_POST['notifier_email'])) : get_option('admin_email'),
+            'hardening_headers'            => isset($_POST['hardening_headers']) ? (bool)$_POST['hardening_headers'] : true,
+            'hardening_file_edit'          => isset($_POST['hardening_file_edit']) ? (bool)$_POST['hardening_file_edit'] : false,
+            'hardening_xmlrpc'             => isset($_POST['hardening_xmlrpc']) ? (bool)$_POST['hardening_xmlrpc'] : false,
+            'hardening_wp_version'         => isset($_POST['hardening_wp_version']) ? (bool)$_POST['hardening_wp_version'] : false,
+            'hardening_author_scan'        => isset($_POST['hardening_author_scan']) ? (bool)$_POST['hardening_author_scan'] : false,
+        ];
+
+        if ($new_settings['url_obfuscator_enabled'] && empty($new_settings['url_obfuscator_slug'])) {
+            wp_send_json_error(__('El slug de acceso personalizado no puede estar vacío.', 'apta-shield'));
+        }
+
+        $merged_settings = array_merge($current_settings, $new_settings);
+
+        if (update_option('apta_shield_settings', $merged_settings)) {
+            if ($merged_settings['url_obfuscator_enabled']) {
+                $this->enable_permalinks_and_flush();
+            } else {
+                flush_rewrite_rules(true);
+            }
+        }
+
+        update_option('apta_shield_wizard_completed', 1);
+        AuditLog::log('wizard_completed', __('Asistente de configuración inicial completado.', 'apta-shield'));
+
+        wp_send_json_success(__('¡Configuración inicial guardada con éxito!', 'apta-shield'));
+    }
+
+    /**
+     * AJAX handler to reset onboarding wizard status.
+     */
+    public function ajax_reset_wizard() {
+        check_ajax_referer('apta_shield_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('Permisos insuficientes.', 'apta-shield'), 403);
+        }
+
+        update_option('apta_shield_wizard_completed', 0);
+        AuditLog::log('wizard_reset', __('Asistente de configuración reiniciado por el administrador.', 'apta-shield'));
+
+        wp_send_json_success(__('El asistente de configuración se ha reiniciado.', 'apta-shield'));
+    }
+
+    /**
+     * Safely enable permalinks if empty and flush rewrite rules.
+     */
+    private function enable_permalinks_and_flush() {
+        if (empty(get_option('permalink_structure'))) {
+            update_option('permalink_structure', '/%postname%/');
+            global $wp_rewrite;
+            if (is_object($wp_rewrite)) {
+                $wp_rewrite->set_permalink_structure('/%postname%/');
+            }
+        }
+        flush_rewrite_rules(true);
     }
 }

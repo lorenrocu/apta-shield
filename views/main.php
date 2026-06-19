@@ -3,6 +3,9 @@ defined('ABSPATH') || exit;
 
 // phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 
+// Wizard status check
+$wizard_completed = (int) get_option('apta_shield_wizard_completed', 0);
+
 // Calculate basic security score (max 100)
 $score = 0;
 if ($settings['firewall_enabled']) $score += 15;
@@ -54,7 +57,7 @@ $total_blocked = intval($total_blocked);
     </header>
 
     <!-- Main Container -->
-    <div class="apta-container">
+    <div class="apta-container <?php echo !$wizard_completed ? 'apta-wizard-active' : ''; ?>">
         <!-- Sidebar Navigation -->
         <aside class="apta-sidebar">
             <nav class="apta-nav">
@@ -62,27 +65,27 @@ $total_blocked = intval($total_blocked);
                     <span class="dashicons dashicons-dashboard"></span>
                     <?php esc_html_e('Resumen', 'apta-shield'); ?>
                 </a>
-                <a href="#scanner" class="apta-nav-item" data-tab="scanner">
+                <a href="#scanner" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="scanner">
                     <span class="dashicons dashicons-search"></span>
                     <?php esc_html_e('Escáner de Virus', 'apta-shield'); ?>
                 </a>
-                <a href="#firewall" class="apta-nav-item" data-tab="firewall">
+                <a href="#firewall" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="firewall">
                     <span class="dashicons dashicons-html"></span>
                     <?php esc_html_e('Firewall y Fuerza Bruta', 'apta-shield'); ?>
                 </a>
-                <a href="#obfuscator" class="apta-nav-item" data-tab="obfuscator">
+                <a href="#obfuscator" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="obfuscator">
                     <span class="dashicons dashicons-admin-links"></span>
                     <?php esc_html_e('Ocultar URL', 'apta-shield'); ?>
                 </a>
-                <a href="#hardening" class="apta-nav-item" data-tab="hardening">
+                <a href="#hardening" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="hardening">
                     <span class="dashicons dashicons-admin-tools"></span>
                     <?php esc_html_e('Endurecimiento', 'apta-shield'); ?>
                 </a>
-                <a href="#audit" class="apta-nav-item" data-tab="audit">
+                <a href="#audit" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="audit">
                     <span class="dashicons dashicons-media-text"></span>
                     <?php esc_html_e('Registro de Actividad', 'apta-shield'); ?>
                 </a>
-                <a href="#settings" class="apta-nav-item" data-tab="settings">
+                <a href="#settings" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="settings">
                     <span class="dashicons dashicons-admin-generic"></span>
                     <?php esc_html_e('Ajustes y Alertas', 'apta-shield'); ?>
                 </a>
@@ -131,12 +134,14 @@ $total_blocked = intval($total_blocked);
                 </section>
 
                 <!-- Floating Save Bar (Visible when settings are dirty) -->
+                <?php if ($wizard_completed) : ?>
                 <div class="apta-save-bar">
                     <p><?php esc_html_e('Tienes cambios sin guardar en tu configuración.', 'apta-shield'); ?></p>
                     <button type="submit" class="apta-btn apta-btn-primary" id="apta-save-btn">
                         <?php esc_html_e('Guardar Cambios', 'apta-shield'); ?>
                     </button>
                 </div>
+                <?php endif; ?>
             </form>
         </main>
     </div>

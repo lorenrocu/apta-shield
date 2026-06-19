@@ -15,7 +15,7 @@ defined('ABSPATH') || exit;
         <div class="apta-form-group toggle-group">
             <div class="toggle-meta">
                 <label class="toggle-title"><?php esc_html_e('Activar Ofuscación de URL', 'apta-shield'); ?></label>
-                <span class="toggle-desc"><?php esc_html_e('Bloquea wp-login.php y redirige a los usuarios no autenticados que intentan entrar a wp-admin a una página de no encontrado (404).', 'apta-shield'); ?></span>
+                <span class="toggle-desc"><?php esc_html_e('Bloquea por completo wp-login.php, wp-admin y wp-register.php. La URL secreta de abajo es la única forma de mostrar el formulario de inicio de sesión. Una vez logueado, todo funciona normal.', 'apta-shield'); ?></span>
             </div>
             <label class="apta-switch">
                 <input type="checkbox" name="url_obfuscator_enabled" id="url_obfuscator_enabled" value="1" <?php checked(1, $settings['url_obfuscator_enabled']); ?> class="settings-trigger">
@@ -50,6 +50,7 @@ defined('ABSPATH') || exit;
                     <li><?php esc_html_e('Guarda y añade a favoritos tu nueva URL de inicio de sesión antes de cerrar esta página.', 'apta-shield'); ?></li>
                     <li><?php esc_html_e('Si olvidas el slug secreto, no podrás ingresar al administrador de forma normal. Para solucionarlo, deberás desactivar el plugin renombrando su directorio vía FTP o base de datos.', 'apta-shield'); ?></li>
                     <li><?php esc_html_e('Si usas plugins de caché externa, te recomendamos vaciar la caché después de guardar estos cambios.', 'apta-shield'); ?></li>
+                    <li><?php esc_html_e('El formulario de WordPress se sirve internamente bajo tu URL secreta, así que wp-login.php nunca queda expuesto. Si desactivas esta opción, wp-login.php vuelve a ser accesible.', 'apta-shield'); ?></li>
                 </ul>
             </div>
         </div>
