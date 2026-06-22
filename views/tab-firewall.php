@@ -32,42 +32,43 @@ defined('ABSPATH') || exit;
         </div>
     </div>
 
-    <!-- Brute Force Card -->
-    <div class="apta-card">
-        <div class="card-header">
-            <h3><?php esc_html_e('Protección contra Fuerza Bruta', 'apta-shield'); ?></h3>
+    <!-- GeoIP Card (Pro) -->
+    <div class="apta-card pro-feature-card">
+        <div class="card-header flex-header">
+            <h3><?php esc_html_e('Bloqueo por Países (GeoIP)', 'apta-shield'); ?></h3>
+            <span class="apta-version" style="background-color: #ffe4e6; color: #be123c; border-color: #fecdd3;"><?php esc_html_e('PRO', 'apta-shield'); ?></span>
         </div>
         <div class="card-body">
-            <div class="apta-form-group toggle-group">
-                <div class="toggle-meta">
-                    <label class="toggle-title"><?php esc_html_e('Activar Protección de Acceso', 'apta-shield'); ?></label>
-                    <span class="toggle-desc"><?php esc_html_e('Monitorea intentos de login fallidos y bloquea temporalmente las direcciones IP sospechosas.', 'apta-shield'); ?></span>
-                </div>
-                <label class="apta-switch">
-                    <input type="checkbox" name="brute_force_enabled" value="1" <?php checked(1, $settings['brute_force_enabled']); ?> class="settings-trigger">
-                    <span class="slider round"></span>
-                </label>
-            </div>
-
-            <div class="apta-settings-subfields <?php echo !$settings['brute_force_enabled'] ? 'disabled-section' : ''; ?>" id="brute-force-subfields">
-                <div class="apta-form-group">
-                    <label for="brute_force_max_attempts" class="form-label"><?php esc_html_e('Intentos de login permitidos', 'apta-shield'); ?></label>
-                    <input type="number" id="brute_force_max_attempts" name="brute_force_max_attempts" min="1" max="20" class="apta-input settings-trigger" value="<?php echo esc_attr($settings['brute_force_max_attempts']); ?>">
-                    <span class="field-desc"><?php esc_html_e('Número de intentos de acceso fallidos antes de bloquear la IP.', 'apta-shield'); ?></span>
-                </div>
-
-                <div class="apta-form-group">
-                    <label for="brute_force_lockout_duration" class="form-label"><?php esc_html_e('Duración del bloqueo (Minutos)', 'apta-shield'); ?></label>
-                    <input type="number" id="brute_force_lockout_duration" name="brute_force_lockout_duration" min="5" max="1440" class="apta-input settings-trigger" value="<?php echo esc_attr($settings['brute_force_lockout_duration']); ?>">
-                    <span class="field-desc"><?php esc_html_e('Tiempo en minutos que la IP sospechosa tendrá denegado el acceso al sitio.', 'apta-shield'); ?></span>
-                </div>
+            <p style="font-size: 13px; color: var(--apta-text-muted); line-height: 1.6; margin-top: 0;"><?php esc_html_e('Impide el acceso a todo el sitio web o a la pantalla de administración desde países de alto riesgo o regiones sospechosas utilizando la base de datos de MaxMind GeoIP.', 'apta-shield'); ?></p>
+            
+            <div style="background: rgba(248, 250, 252, 0.85); border: 1px dashed var(--apta-border); border-radius: var(--apta-radius-sm); padding: 16px; text-align: center; margin-top: 12px;">
+                <span class="dashicons dashicons-location" style="font-size: 24px; width: 24px; height: 24px; color: var(--apta-danger); margin-bottom: 4px;"></span>
+                <h4 style="font-size: 13px; font-weight: 700; margin: 0 0 2px 0;"><?php esc_html_e('Obtén Apta Shield Pro para bloquear por países', 'apta-shield'); ?></h4>
+                <p style="font-size: 11px; color: var(--apta-text-muted); margin: 0;"><?php esc_html_e('Detén ataques de hackers masivos localizados geográficamente.', 'apta-shield'); ?></p>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Rate Limiting Card (Pro) -->
+<div class="apta-card pro-feature-card">
+    <div class="card-header flex-header">
+        <h3><?php esc_html_e('Limitación de Tasa Avanzada (Rate Limiting)', 'apta-shield'); ?></h3>
+        <span class="apta-version" style="background-color: #ffe4e6; color: #be123c; border-color: #fecdd3;"><?php esc_html_e('PRO', 'apta-shield'); ?></span>
+    </div>
+    <div class="card-body">
+        <p style="font-size: 13px; color: var(--apta-text-muted); line-height: 1.6; margin-top: 0;"><?php esc_html_e('Evita el raspado de datos (scrapers), ataques DDoS a páginas lentas e intentos de fuerza bruta sofisticados limitando el número máximo de peticiones por minuto por IP.', 'apta-shield'); ?></p>
+        
+        <div style="background: rgba(248, 250, 252, 0.85); border: 1px dashed var(--apta-border); border-radius: var(--apta-radius-sm); padding: 16px; text-align: center; margin-top: 12px;">
+            <span class="dashicons dashicons-performance" style="font-size: 24px; width: 24px; height: 24px; color: var(--apta-danger); margin-bottom: 4px;"></span>
+            <h4 style="font-size: 13px; font-weight: 700; margin: 0 0 2px 0;"><?php esc_html_e('Activa Rate Limiting con Apta Shield Pro', 'apta-shield'); ?></h4>
+            <p style="font-size: 11px; color: var(--apta-text-muted); margin: 0;"><?php esc_html_e('Optimiza el uso de CPU de tu hosting controlando el tráfico abusivo.', 'apta-shield'); ?></p>
+        </div>
+    </div>
+</div>
+
 <!-- Active Bans Card -->
-<div class="apta-card active-bans-card">
+<div class="apta-card active-bans-card" style="margin-top: 24px;">
     <div class="card-header flex-header">
         <h3><?php esc_html_e('Direcciones IP Bloqueadas', 'apta-shield'); ?></h3>
         <button type="button" class="apta-btn apta-btn-secondary" id="apta-refresh-bans">

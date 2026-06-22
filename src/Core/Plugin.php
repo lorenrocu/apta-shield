@@ -13,6 +13,7 @@ use AptaShield\Modules\Reinstaller\Reinstaller;
 use AptaShield\Modules\Notifier\Notifier;
 use AptaShield\Modules\AuditLog\AuditLog;
 use AptaShield\Modules\Hardening\Hardening;
+use AptaShield\Modules\Captcha\Captcha;
 use AptaShield\Admin\Dashboard;
 
 /**
@@ -95,6 +96,12 @@ class Plugin {
             $this->modules['url_obfuscator']->run();
         }
 
+        // 2.1 Initialize CAPTCHA
+        if ($this->is_module_enabled('captcha')) {
+            $this->modules['captcha'] = new Captcha();
+            $this->modules['captcha']->run();
+        }
+
         // 3. Initialize Notifier
         if ($this->is_module_enabled('notifier')) {
             $this->modules['notifier'] = new Notifier();
@@ -134,6 +141,8 @@ class Plugin {
                 return !empty($settings['brute_force_enabled']);
             case 'url_obfuscator':
                 return !empty($settings['url_obfuscator_enabled']);
+            case 'captcha':
+                return !empty($settings['captcha_enabled']);
             case 'notifier':
                 return !empty($settings['notifier_enabled']);
             default:
@@ -154,6 +163,15 @@ class Plugin {
             'brute_force_lockout_duration' => 60, // in minutes
             'url_obfuscator_enabled'       => false,
             'url_obfuscator_slug'          => 'mi-login-secreto',
+            'captcha_enabled'              => false,
+            'captcha_provider'             => 'turnstile',
+            'captcha_site_key'             => '',
+            'captcha_secret_key'           => '',
+            'captcha_on_login'             => true,
+            'captcha_on_register'          => true,
+            'captcha_on_lostpassword'      => true,
+            'captcha_on_comments'          => false,
+            'captcha_on_woocommerce'       => false,
             'scanner_auto_scan'            => true,
             'scanner_auto_recovery'        => false,
             'notifier_enabled'             => true,
@@ -163,6 +181,9 @@ class Plugin {
             'hardening_xmlrpc'             => true,
             'hardening_wp_version'         => true,
             'hardening_author_scan'        => true,
+            'two_factor_enabled'           => false,
+            'password_strong_force'        => false,
+            'password_expiration'          => false,
             'trusted_proxies'              => [], // Stored separately as a WP option
         ];
 
@@ -227,5 +248,24 @@ class Plugin {
             Database::create_tables();
             update_option('apta_shield_db_version', APTA_SHIELD_VERSION);
         }
+    }
+
+    /**
+     * Check if the Pro version is installed and has an active license.
+     *
+     * @return bool
+     */
+    public static function is_pro_active() {
+        if (!defined('APTA_SHIELD_PRO_VERSION')) {
+            return false;
+        }
+        if (class_exists('AptaShieldPro\Core\PluginPro')) {
+            $plugin_pro = \AptaShieldPro\Core\PluginPro::get_instance();
+            $license_mgr = $plugin_pro->get_module('license');
+            if ($license_mgr && method_exists($license_mgr, 'is_license_active')) {
+                return $license_mgr->is_license_active();
+            }
+        }
+        return false;
     }
 }

@@ -20,6 +20,7 @@ class Scanner implements ModuleInterface {
     public function run() {
         // Register scan AJAX endpoints
         add_action('wp_ajax_apta_shield_run_scan', [$this, 'ajax_run_scan']);
+        add_action('wp_ajax_apta_shield_clean_threat', [$this, 'ajax_clean_threat']);
         add_action('apta_shield_daily_scan', [$this, 'execute_daily_scan_cron']);
     }
 
@@ -137,7 +138,6 @@ class Scanner implements ModuleInterface {
         $threats = get_option('apta_scan_threats_temp', []);
         $logs = [];
 
-        $signatures = Signatures::get_signatures();
         $abspath_normalized = wp_normalize_path(ABSPATH);
 
         $plugin_dir = dirname(plugin_basename(APTA_SHIELD_FILE));
@@ -173,22 +173,19 @@ class Scanner implements ModuleInterface {
                 }
             }
 
-            // 2. Heuristic Signature Check (read first 1MB of file content)
-            $content = file_get_contents($file_path, false, null, 0, 1024 * 1024);
-            if (!empty($content)) {
-                foreach ($signatures as $sig) {
-                    if (preg_match($sig['pattern'], $content)) {
-                        $threats[] = [
-                            'file'       => $relative_path,
-                            'type'       => 'malware',
-                            'type_label' => $sig['label'],
-                            'desc'       => $sig['desc']
-                        ];
-                        // translators: 1: File path, 2: Malware signature label.
-                        $logs[] = sprintf(__('[x] Malware encontrado en: %1$s (%2$s)', 'apta-shield'), $relative_path, $sig['label']);
-                        break; // Stop after first match in a file
-                    }
-                }
+            // 2. Explainable local risk analysis. It combines IOCs and behaviour;
+            // it never executes or attempts to decrypt untrusted code.
+            $finding = FileAnalyzer::analyse($file_path, $relative_path);
+            if ($finding) {
+                $threats[] = [
+                    'file'       => $relative_path,
+                    'type'       => 'malware',
+                    'type_label' => $finding['label'],
+                    'desc'       => $finding['desc'],
+                    'risk_score' => $finding['score'],
+                    'reasons'    => $finding['reasons'],
+                ];
+                $logs[] = sprintf(__('[x] Riesgo de malware encontrado en: %1$s (%2$s)', 'apta-shield'), $relative_path, $finding['label']);
             }
         }
 
@@ -265,6 +262,11 @@ class Scanner implements ModuleInterface {
         // Save last scan result
         update_option('apta_shield_last_scan_result', $results);
 
+        // Report detections to Megapattern API Hub for global malware telemetry (free tier)
+        if (!empty($threats)) {
+            $this->report_threats_to_cloud($threats);
+        }
+
         // Log to Audit Log
         \AptaShield\Modules\AuditLog\AuditLog::log(
             'scan_completed',
@@ -318,14 +320,16 @@ class Scanner implements ModuleInterface {
         $files = [];
         $root = wp_normalize_path(ABSPATH);
 
-        // Scan Root php files
-        $root_files = glob($root . '*.php');
-        if (is_array($root_files)) {
-            $files = array_merge($files, $root_files);
+        // Root loaders and server configuration are common persistence points.
+        foreach (['.htaccess', '.user.ini', 'php.ini', 'wp-config.php', 'wp-settings.php', 'wp-load.php'] as $root_file) {
+            if (is_file($root . $root_file)) {
+                $files[] = wp_normalize_path($root . $root_file);
+            }
         }
 
-        // Scan wp-admin, wp-includes and wp-content directories
-        $scan_dirs = ['wp-admin', 'wp-includes', 'wp-content/themes', 'wp-content/plugins'];
+        // MU plugins load before normal plugins and are frequently abused for persistence.
+        // They must be scanned explicitly: they are not children of wp-content/plugins.
+        $scan_dirs = ['wp-admin', 'wp-includes', 'wp-content/themes', 'wp-content/plugins', 'wp-content/mu-plugins', 'wp-content/uploads', 'wp-content/cache', 'wp-content/upgrade'];
         foreach ($scan_dirs as $dir) {
             $path = $root . $dir;
             if (is_dir($path)) {
@@ -349,17 +353,30 @@ class Scanner implements ModuleInterface {
         foreach ($files as $value) {
             $path = $dir . '/' . $value;
             if (!is_dir($path)) {
-                if (pathinfo($path, PATHINFO_EXTENSION) === 'php') {
+                if ($this->is_scannable_file($path)) {
                     $results[] = wp_normalize_path($path);
                 }
             } elseif ($value !== '.' && $value !== '..') {
-                // Ignore backup, cache and uploads folders
-                if ($value === 'uploads' || $value === 'cache' || $value === 'node_modules' || $value === 'backups') {
+                // Scan uploads/cache/backups too: attackers routinely hide PHP there.
+                // node_modules is excluded because it is dependency source, not web payload.
+                if ($value === 'node_modules') {
                     continue;
                 }
                 $this->get_files_recursive($path, $results);
             }
         }
+    }
+
+    /**
+     * Scan PHP and common alternate PHP extensions, including .htaccess files.
+     */
+    private function is_scannable_file($path) {
+        $basename = strtolower(basename($path));
+        if (in_array($basename, ['.htaccess', '.user.ini', 'php.ini'], true)) {
+            return true;
+        }
+
+        return in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['php', 'phtml', 'pht', 'phar', 'php3', 'php4', 'php5', 'php7', 'php8'], true);
     }
 
     /**
@@ -381,6 +398,60 @@ class Scanner implements ModuleInterface {
         }
 
         return true;
+    }
+
+    /**
+     * Delete a malware file that was found by this scanner.
+     *
+     * The operation is deliberately restricted to wp-content. Core files and
+     * arbitrary paths can never be removed through this endpoint.
+     */
+    public function ajax_clean_threat() {
+        check_ajax_referer('apta_shield_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('Permisos insuficientes.', 'apta-shield'), 403);
+        }
+
+        $threat_index = isset($_POST['threat_index']) ? intval(wp_unslash($_POST['threat_index'])) : -1;
+        $results = get_option('apta_shield_last_scan_result', []);
+
+        if ($threat_index < 0 || empty($results['threats']) || empty($results['threats'][$threat_index])) {
+            wp_send_json_error(__('Amenaza no válida o resultado de análisis caducado.', 'apta-shield'));
+        }
+
+        $threat = $results['threats'][$threat_index];
+        $relative_path = ltrim((string) $threat['file'], '/');
+        $allowed_prefixes = ['wp-content/plugins/', 'wp-content/mu-plugins/'];
+        $is_allowed_path = false;
+        foreach ($allowed_prefixes as $prefix) {
+            if (strpos($relative_path, $prefix) === 0) {
+                $is_allowed_path = true;
+                break;
+            }
+        }
+
+        if (($threat['type'] ?? '') !== 'malware' || !$is_allowed_path) {
+            wp_send_json_error(__('Por seguridad, solo se eliminan archivos de malware detectados dentro de plugins o mu-plugins.', 'apta-shield'));
+        }
+
+        $file_path = wp_normalize_path(ABSPATH . $relative_path);
+        $content_dir = trailingslashit(wp_normalize_path(WP_CONTENT_DIR));
+        if (strpos($file_path, $content_dir) !== 0 || !is_file($file_path) || !Quarantine::isolate($file_path, $relative_path)) {
+            wp_send_json_error(__('No se pudo poner el archivo en cuarentena. Comprueba los permisos del servidor.', 'apta-shield'));
+        }
+
+        unset($results['threats'][$threat_index]);
+        $results['threats'] = array_values($results['threats']);
+        $results['malware_count'] = count(array_filter($results['threats'], function ($item) {
+            return ($item['type'] ?? '') === 'malware';
+        }));
+        $results['core_modified_count'] = count(array_filter($results['threats'], function ($item) {
+            return ($item['type'] ?? '') === 'core_modified';
+        }));
+        update_option('apta_shield_last_scan_result', $results);
+
+        wp_send_json_success(__('Archivo malicioso aislado en cuarentena. Ejecuta otro análisis completo para buscar persistencia adicional.', 'apta-shield'));
     }
 
     /**
@@ -408,7 +479,6 @@ class Scanner implements ModuleInterface {
 
         $files = $this->gather_php_files();
         $threats = [];
-        $signatures = Signatures::get_signatures();
         $abspath_normalized = wp_normalize_path(ABSPATH);
 
         $plugin_dir = dirname(plugin_basename(APTA_SHIELD_FILE));
@@ -438,19 +508,16 @@ class Scanner implements ModuleInterface {
                 }
             }
 
-            $content = file_get_contents($file_path, false, null, 0, 1024 * 1024);
-            if (!empty($content)) {
-                foreach ($signatures as $sig) {
-                    if (preg_match($sig['pattern'], $content)) {
-                        $threats[] = [
-                            'file'       => $relative_path,
-                            'type'       => 'malware',
-                            'type_label' => $sig['label'],
-                            'desc'       => $sig['desc']
-                        ];
-                        break;
-                    }
-                }
+            $finding = FileAnalyzer::analyse($file_path, $relative_path);
+            if ($finding) {
+                $threats[] = [
+                    'file'       => $relative_path,
+                    'type'       => 'malware',
+                    'type_label' => $finding['label'],
+                    'desc'       => $finding['desc'],
+                    'risk_score' => $finding['score'],
+                    'reasons'    => $finding['reasons'],
+                ];
             }
         }
 
@@ -486,6 +553,11 @@ class Scanner implements ModuleInterface {
 
         update_option('apta_shield_last_scan_result', $results);
 
+        // Report detections to Megapattern API Hub for global malware telemetry (free tier)
+        if (!empty($threats)) {
+            $this->report_threats_to_cloud($threats);
+        }
+
         // Send email alert if threats exist
         $notifier = Plugin::get_instance()->get_module('notifier');
         if ($notifier && ($malware_count > 0 || $core_modified_count > 0)) {
@@ -498,6 +570,49 @@ class Scanner implements ModuleInterface {
             if ($reinstaller) {
                 $reinstaller->execute_reinstallation();
             }
+        }
+    }
+
+    /**
+     * Report detected threats to the Megapattern Central API Hub.
+     *
+     * This method is called by both the interactive scan and the daily cron.
+     * It sends a lightweight POST request to the free telemetry endpoint
+     * (/api/v1/shield/malware/report-threats-free) using the special sentinel
+     * license value 'free'. The API Hub stores the findings to grow the global
+     * malware signature database without requiring a paid license.
+     *
+     * The request is fire-and-forget: failures are logged to the WP error log
+     * but never bubble up to the user interface.
+     *
+     * @param array $threats Flat array of threat records detected during the scan.
+     */
+    private function report_threats_to_cloud( array $threats ) {
+        $payload = [
+            'scan_time'     => current_time( 'c' ),
+            'total_threats' => count( $threats ),
+            'threats'       => $threats,
+        ];
+
+        $response = wp_remote_post(
+            'https://megapattern-system.vercel.app/api/v1/shield/malware/report-threats-free',
+            [
+                'timeout'     => 8,
+                'blocking'    => false, // fire-and-forget: do not wait for response
+                'headers'     => [
+                    'Content-Type'   => 'application/json',
+                    'X-Apta-License' => 'free',
+                    'X-Apta-Domain'  => esc_url_raw( home_url() ),
+                    'X-Apta-Product' => 'apta-shield',
+                ],
+                'body'        => wp_json_encode( $payload ),
+                'data_format' => 'body',
+            ]
+        );
+
+        if ( is_wp_error( $response ) ) {
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log( '[Apta Shield] Telemetry report failed: ' . $response->get_error_message() );
         }
     }
 }

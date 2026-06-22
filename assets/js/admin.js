@@ -65,8 +65,24 @@ jQuery(document).ready(function($) {
         if ($(this).attr('name') === 'url_obfuscator_enabled') {
             if ($(this).is(':checked')) {
                 $('#url-obfuscator-subfields').removeClass('disabled-section');
+                $('#url-obfuscator-warning-box').removeClass('hidden');
             } else {
                 $('#url-obfuscator-subfields').addClass('disabled-section');
+                $('#url-obfuscator-warning-box').addClass('hidden');
+            }
+        }
+        if ($(this).attr('name') === 'captcha_enabled') {
+            if ($(this).is(':checked')) {
+                $('#captcha-subfields').removeClass('disabled-section');
+            } else {
+                $('#captcha-subfields').addClass('disabled-section');
+            }
+        }
+        if ($(this).attr('name') === 'two_factor_enabled') {
+            if ($(this).is(':checked')) {
+                $('#two-factor-subfields').removeClass('disabled-section');
+            } else {
+                $('#two-factor-subfields').addClass('disabled-section');
             }
         }
         if ($(this).attr('name') === 'notifier_enabled') {
@@ -307,12 +323,23 @@ jQuery(document).ready(function($) {
 
                     if (totalThreats > 0 && data.threats && data.threats.length) {
                         let tableHtml = '';
-                        data.threats.forEach(function(threat) {
+                        data.threats.forEach(function(threat, index) {
                             const badgeClass = threat.type === 'malware' ? 'danger' : 'warning';
-                            tableHtml += `<tr>
+                            let actionHtml = '';
+                            if (threat.type === 'core_modified') {
+                                actionHtml = '<span class="text-muted">Usa reinstalación</span>';
+                            } else {
+                                if (data.is_pro) {
+                                    actionHtml = `<button type="button" class="apta-btn apta-btn-danger apta-btn-sm apta-clean-threat-btn" data-index="${index}">Limpiar</button>`;
+                                } else {
+                                    actionHtml = '<span class="badge badge-warning">Pro Only</span>';
+                                }
+                            }
+                            tableHtml += `<tr id="apta-threat-row-${index}">
                                 <td><code>${escapeHtml(threat.file)}</code></td>
                                 <td><span class="badge badge-${badgeClass}">${escapeHtml(threat.type_label)}</span></td>
                                 <td>${escapeHtml(threat.desc)}</td>
+                                <td>${actionHtml}</td>
                             </tr>`;
                         });
                         $tbody.html(tableHtml);
@@ -338,38 +365,125 @@ jQuery(document).ready(function($) {
         });
     }
 
+    // Custom confirmation modal helper with dynamic styling support
+    function customConfirm(title, message, onConfirm, type = 'danger') {
+        const $modal = $('#apta-confirm-modal');
+        const $title = $('#apta-modal-title');
+        const $message = $('#apta-modal-message');
+        const $icon = $modal.find('.modal-icon');
+        const $confirmBtn = $('#apta-modal-confirm');
+        
+        $title.text(title);
+        $message.text(message);
+        
+        // Reset classes
+        $icon.removeClass('dashicons-shield dashicons-warning dashicons-info dashicons-update-alt text-danger text-warning text-primary text-success');
+        $confirmBtn.removeClass('apta-btn-danger apta-btn-warning apta-btn-primary apta-btn-success');
+        
+        // Set type classes
+        if (type === 'danger') {
+            $icon.addClass('dashicons-shield text-danger');
+            $confirmBtn.addClass('apta-btn-danger');
+        } else if (type === 'warning') {
+            $icon.addClass('dashicons-warning text-warning');
+            $confirmBtn.addClass('apta-btn-warning');
+        } else if (type === 'success') {
+            $icon.addClass('dashicons-shield text-success');
+            $confirmBtn.addClass('apta-btn-success');
+        } else {
+            $icon.addClass('dashicons-info text-primary');
+            $confirmBtn.addClass('apta-btn-primary');
+        }
+        
+        $modal.removeClass('hidden');
+        
+        // Remove previous event listeners
+        $confirmBtn.off('click');
+        $('#apta-modal-cancel').off('click');
+        
+        $confirmBtn.on('click', function() {
+            $modal.addClass('hidden');
+            onConfirm();
+        });
+        
+        $('#apta-modal-cancel').on('click', function() {
+            $modal.addClass('hidden');
+        });
+    }
+
+    // 7.1 Clean threat action via AJAX
+    $(document).on('click', '.apta-clean-threat-btn', function() {
+        const $btn = $(this);
+        const index = $btn.data('index');
+        
+        customConfirm(
+            'Confirmar Desinfección',
+            '¿Estás seguro de que deseas limpiar esta amenaza? Esta acción intentará eliminar el archivo malicioso o limpiar las inyecciones de código de tu base de datos.',
+            function() {
+                $btn.prop('disabled', true).html('<span class="apta-spinner"></span>');
+                
+                $.post(aptaShield.ajax_url, {
+                    action: 'apta_shield_clean_threat',
+                    threat_index: index,
+                    nonce: aptaShield.nonce
+                }, function(response) {
+                    if (response.success) {
+                        showToast(response.data, 'success');
+                        $(`#apta-threat-row-${index}`).fadeOut(400, function() {
+                            $(this).remove();
+                            if ($('#apta-scan-tbody tr').length === 0) {
+                                $('#apta-scan-details-list').addClass('hidden');
+                                $('#apta-res-malware-count').text('0');
+                                $('#apta-res-core-count').text('0');
+                            }
+                        });
+                    } else {
+                        showToast(response.data || 'Error al limpiar la amenaza.', 'error');
+                        $btn.prop('disabled', false).text('Limpiar');
+                    }
+                }).fail(function() {
+                    showToast('Error de red al intentar limpiar la amenaza.', 'error');
+                    $btn.prop('disabled', false).text('Limpiar');
+                });
+            }
+        );
+    });
+
     // 8. One-Click Core Reinstallation
     $('#apta-run-reinstall').on('click', function() {
-        if (!confirm(aptaShield.messages.confirm_reinstall)) {
-            return;
-        }
+        customConfirm(
+            'Reinstalar WordPress Core',
+            aptaShield.messages.confirm_reinstall || '¿Estás seguro de que deseas reinstalar el núcleo oficial de WordPress? Esto sobrescribirá los archivos del núcleo modificados.',
+            function() {
+                const $btn = $('#apta-run-reinstall');
+                $btn.prop('disabled', true).html('<span class="apta-spinner"></span> Reinstalando...');
 
-        const $btn = $(this);
-        $btn.prop('disabled', true).html('<span class="apta-spinner"></span> Reinstalando...');
+                const $progressBox = $('#apta-reinstall-progress-box');
+                const $statusText = $('#apta-reinstall-status-text');
 
-        const $progressBox = $('#apta-reinstall-progress-box');
-        const $statusText = $('#apta-reinstall-status-text');
+                $progressBox.removeClass('hidden');
+                $statusText.text('Iniciando descarga y preparación del núcleo de WordPress...');
 
-        $progressBox.removeClass('hidden');
-        $statusText.text('Iniciando descarga y preparación del núcleo de WordPress...');
-
-        $.post(aptaShield.ajax_url, {
-            action: 'apta_shield_reinstall_core',
-            nonce: aptaShield.nonce
-        }, function(response) {
-            if (response.success) {
-                $statusText.text('Proceso completado. Los archivos del core fueron reemplazados.');
-                showToast(response.data, 'success');
-            } else {
-                $statusText.text('Error en la reinstalación: ' + response.data);
-                showToast(response.data || 'Ocurrió un error al reinstalar.', 'error');
-            }
-        }).fail(function() {
-            $statusText.text('Error de conexión con el servidor.');
-            showToast('Error de comunicación con el servidor durante la reinstalación.', 'error');
-        }).always(function() {
-            $btn.prop('disabled', false).html('<span class="dashicons dashicons-update-alt icon-btn"></span> Reinstalar WordPress Core en 1-Clic');
-        });
+                $.post(aptaShield.ajax_url, {
+                    action: 'apta_shield_reinstall_core',
+                    nonce: aptaShield.nonce
+                }, function(response) {
+                    if (response.success) {
+                        $statusText.text('Proceso completado. Los archivos del core fueron reemplazados.');
+                        showToast(response.data, 'success');
+                    } else {
+                        $statusText.text('Error en la reinstalación: ' + response.data);
+                        showToast(response.data || 'Ocurrió un error al reinstalar.', 'error');
+                    }
+                }).fail(function() {
+                    $statusText.text('Error de conexión con el servidor.');
+                    showToast('Error de comunicación con el servidor durante la reinstalación.', 'error');
+                }).always(function() {
+                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-update-alt icon-btn"></span> Reinstalar WordPress Core en 1-Clic');
+                });
+            },
+            'danger'
+        );
     });
 
     // 9. Audit Logs Manager
@@ -403,29 +517,32 @@ jQuery(document).ready(function($) {
 
         // Clear Audit Logs button
         $('#apta-clear-audit-btn').on('click', function() {
-            if (!confirm(aptaShield.messages.confirm_clear_audit)) {
-                return;
-            }
+            customConfirm(
+                'Vaciar Historial',
+                aptaShield.messages.confirm_clear_audit || '¿Estás seguro de que deseas vaciar el historial de actividad de seguridad?',
+                function() {
+                    const $btn = $('#apta-clear-audit-btn');
+                    $btn.prop('disabled', true).html('<span class="apta-spinner"></span> Vaciando...');
 
-            const $btn = $(this);
-            $btn.prop('disabled', true).html('<span class="apta-spinner"></span> Vaciando...');
-
-            $.post(aptaShield.ajax_url, {
-                action: 'apta_shield_clear_audit_logs',
-                nonce: aptaShield.nonce
-            }, function(response) {
-                if (response.success) {
-                    showToast(response.data, 'success');
-                    currentAuditPage = 1;
-                    loadAuditLogs();
-                } else {
-                    showToast(response.data || aptaShield.messages.error, 'error');
-                }
-            }).fail(function() {
-                showToast(aptaShield.messages.error, 'error');
-            }).always(function() {
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-trash icon-btn"></span> Vaciar Historial');
-            });
+                    $.post(aptaShield.ajax_url, {
+                        action: 'apta_shield_clear_audit_logs',
+                        nonce: aptaShield.nonce
+                    }, function(response) {
+                        if (response.success) {
+                            showToast(response.data, 'success');
+                            currentAuditPage = 1;
+                            loadAuditLogs();
+                        } else {
+                            showToast(response.data || aptaShield.messages.error, 'error');
+                        }
+                    }).fail(function() {
+                        showToast(aptaShield.messages.error, 'error');
+                    }).always(function() {
+                        $btn.prop('disabled', false).html('<span class="dashicons dashicons-trash icon-btn"></span> Vaciar Historial');
+                    });
+                },
+                'warning'
+            );
         });
     }
 
@@ -501,28 +618,31 @@ jQuery(document).ready(function($) {
     function initWizard() {
         // Reset Wizard click handler (always registered for settings page)
         $('#apta-reset-wizard-btn').on('click', function() {
-            if (!confirm(aptaShield.messages.confirm_reset_wizard)) {
-                return;
-            }
+            customConfirm(
+                'Reiniciar Asistente',
+                aptaShield.messages.confirm_reset_wizard || '¿Estás seguro de que deseas volver a ejecutar el asistente de configuración?',
+                function() {
+                    const $btn = $('#apta-reset-wizard-btn');
+                    $btn.prop('disabled', true).html('<span class="apta-spinner"></span> Reiniciando...');
 
-            const $btn = $(this);
-            $btn.prop('disabled', true).html('<span class="apta-spinner"></span> Reiniciando...');
-
-            $.post(aptaShield.ajax_url, {
-                action: 'apta_shield_reset_wizard',
-                nonce: aptaShield.nonce
-            }, function(response) {
-                if (response.success) {
-                    showToast(response.data, 'success');
-                    window.location.reload();
-                } else {
-                    showToast(response.data || aptaShield.messages.error, 'error');
-                    $btn.prop('disabled', false).html('<span class="dashicons dashicons-update icon-btn"></span> Volver a ejecutar el Asistente');
-                }
-            }).fail(function() {
-                showToast(aptaShield.messages.error, 'error');
-                $btn.prop('disabled', false).html('<span class="dashicons dashicons-update icon-btn"></span> Volver a ejecutar el Asistente');
-            });
+                    $.post(aptaShield.ajax_url, {
+                        action: 'apta_shield_reset_wizard',
+                        nonce: aptaShield.nonce
+                    }, function(response) {
+                        if (response.success) {
+                            showToast(response.data, 'success');
+                            window.location.reload();
+                        } else {
+                            showToast(response.data || aptaShield.messages.error, 'error');
+                            $btn.prop('disabled', false).html('<span class="dashicons dashicons-update icon-btn"></span> Volver a ejecutar el Asistente');
+                        }
+                    }).fail(function() {
+                        showToast(aptaShield.messages.error, 'error');
+                        $btn.prop('disabled', false).html('<span class="dashicons dashicons-update icon-btn"></span> Volver a ejecutar el Asistente');
+                    });
+                },
+                'warning'
+            );
         });
 
         if (aptaShield.wizard_completed === 1) return;

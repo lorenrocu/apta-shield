@@ -139,6 +139,13 @@ class Dashboard {
             'brute_force_lockout_duration' => isset($_POST['brute_force_lockout_duration']) ? max(1, intval($_POST['brute_force_lockout_duration'])) : 60,
             'url_obfuscator_enabled'       => isset($_POST['url_obfuscator_enabled']) ? (bool)$_POST['url_obfuscator_enabled'] : false,
             'url_obfuscator_slug'          => isset($_POST['url_obfuscator_slug']) ? sanitize_title(wp_unslash($_POST['url_obfuscator_slug'])) : 'mi-login-secreto',
+            'captcha_enabled'              => isset($_POST['captcha_enabled']) ? (bool)$_POST['captcha_enabled'] : false,
+            'captcha_provider'             => isset($_POST['captcha_provider']) ? sanitize_key($_POST['captcha_provider']) : 'turnstile',
+            'captcha_site_key'             => isset($_POST['captcha_site_key']) ? sanitize_text_field(wp_unslash($_POST['captcha_site_key'])) : '',
+            'captcha_secret_key'           => isset($_POST['captcha_secret_key']) ? sanitize_text_field(wp_unslash($_POST['captcha_secret_key'])) : '',
+            'captcha_on_login'             => isset($_POST['captcha_on_login']) ? (bool)$_POST['captcha_on_login'] : false,
+            'captcha_on_register'          => isset($_POST['captcha_on_register']) ? (bool)$_POST['captcha_on_register'] : false,
+            'captcha_on_lostpassword'      => isset($_POST['captcha_on_lostpassword']) ? (bool)$_POST['captcha_on_lostpassword'] : false,
             'scanner_auto_scan'            => isset($_POST['scanner_auto_scan']) ? (bool)$_POST['scanner_auto_scan'] : false,
             'scanner_auto_recovery'        => isset($_POST['scanner_auto_recovery']) ? (bool)$_POST['scanner_auto_recovery'] : false,
             'notifier_enabled'             => isset($_POST['notifier_enabled']) ? (bool)$_POST['notifier_enabled'] : false,
@@ -150,11 +157,23 @@ class Dashboard {
             'hardening_xmlrpc'             => isset($_POST['hardening_xmlrpc']) ? (bool)$_POST['hardening_xmlrpc'] : false,
             'hardening_wp_version'         => isset($_POST['hardening_wp_version']) ? (bool)$_POST['hardening_wp_version'] : false,
             'hardening_author_scan'        => isset($_POST['hardening_author_scan']) ? (bool)$_POST['hardening_author_scan'] : false,
+
+            // Pro options
+            'two_factor_enabled'           => Plugin::is_pro_active() && isset($_POST['two_factor_enabled']) ? (bool)$_POST['two_factor_enabled'] : false,
+            'password_strong_force'        => Plugin::is_pro_active() && isset($_POST['password_strong_force']) ? (bool)$_POST['password_strong_force'] : false,
+            'password_expiration'          => Plugin::is_pro_active() && isset($_POST['password_expiration']) ? (bool)$_POST['password_expiration'] : false,
+            'captcha_on_comments'          => Plugin::is_pro_active() && isset($_POST['captcha_on_comments']) ? (bool)$_POST['captcha_on_comments'] : false,
+            'captcha_on_woocommerce'       => Plugin::is_pro_active() && isset($_POST['captcha_on_woocommerce']) ? (bool)$_POST['captcha_on_woocommerce'] : false,
         ];
 
         // Ensure the slug is not empty or default wp-login/wp-admin
         if ($new_settings['url_obfuscator_enabled'] && empty($new_settings['url_obfuscator_slug'])) {
             wp_send_json_error(__('El slug de acceso personalizado no puede estar vacío.', 'apta-shield'));
+        }
+
+        // Validate CAPTCHA keys
+        if ($new_settings['captcha_enabled'] && (empty($new_settings['captcha_site_key']) || empty($new_settings['captcha_secret_key']))) {
+            wp_send_json_error(__('Las llaves del CAPTCHA no pueden estar vacías si está activado.', 'apta-shield'));
         }
 
         $merged_settings = array_merge($current_settings, $new_settings);

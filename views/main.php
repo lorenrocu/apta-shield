@@ -70,12 +70,12 @@ $total_blocked = intval($total_blocked);
                     <?php esc_html_e('Escáner de Virus', 'apta-shield'); ?>
                 </a>
                 <a href="#firewall" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="firewall">
-                    <span class="dashicons dashicons-html"></span>
-                    <?php esc_html_e('Firewall y Fuerza Bruta', 'apta-shield'); ?>
+                    <span class="dashicons dashicons-shield"></span>
+                    <?php esc_html_e('Firewall (WAF)', 'apta-shield'); ?>
                 </a>
-                <a href="#obfuscator" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="obfuscator">
-                    <span class="dashicons dashicons-admin-links"></span>
-                    <?php esc_html_e('Ocultar URL', 'apta-shield'); ?>
+                <a href="#access" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="access">
+                    <span class="dashicons dashicons-lock"></span>
+                    <?php esc_html_e('Seguridad de Acceso', 'apta-shield'); ?>
                 </a>
                 <a href="#hardening" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="hardening">
                     <span class="dashicons dashicons-admin-tools"></span>
@@ -89,6 +89,12 @@ $total_blocked = intval($total_blocked);
                     <span class="dashicons dashicons-admin-generic"></span>
                     <?php esc_html_e('Ajustes y Alertas', 'apta-shield'); ?>
                 </a>
+                <?php if (defined('APTA_SHIELD_PRO_VERSION')) : ?>
+                <a href="#license" class="apta-nav-item <?php echo !$wizard_completed ? 'apta-nav-disabled' : ''; ?>" data-tab="license">
+                    <span class="dashicons dashicons-key"></span>
+                    <?php esc_html_e('Licencia PRO', 'apta-shield'); ?>
+                </a>
+                <?php endif; ?>
             </nav>
         </aside>
 
@@ -113,9 +119,9 @@ $total_blocked = intval($total_blocked);
                     <?php include APTA_SHIELD_PATH . 'views/tab-firewall.php'; ?>
                 </section>
 
-                <!-- Tab: Obfuscator -->
-                <section id="tab-obfuscator" class="apta-tab-content">
-                    <?php include APTA_SHIELD_PATH . 'views/tab-obfuscator.php'; ?>
+                <!-- Tab: Access (Login Security) -->
+                <section id="tab-access" class="apta-tab-content">
+                    <?php include APTA_SHIELD_PATH . 'views/tab-access.php'; ?>
                 </section>
 
                 <!-- Tab: Hardening -->
@@ -133,6 +139,13 @@ $total_blocked = intval($total_blocked);
                     <?php include APTA_SHIELD_PATH . 'views/tab-settings.php'; ?>
                 </section>
 
+                <?php if (defined('APTA_SHIELD_PRO_VERSION')) : ?>
+                <!-- Tab: License -->
+                <section id="tab-license" class="apta-tab-content">
+                    <?php do_action('apta_shield_pro_render_license_tab'); ?>
+                </section>
+                <?php endif; ?>
+
                 <!-- Floating Save Bar (Visible when settings are dirty) -->
                 <?php if ($wizard_completed) : ?>
                 <div class="apta-save-bar">
@@ -144,5 +157,22 @@ $total_blocked = intval($total_blocked);
                 <?php endif; ?>
             </form>
         </main>
+    </div>
+</div>
+
+<!-- Custom Confirmation Modal Overlay -->
+<div id="apta-confirm-modal" class="apta-modal-overlay hidden">
+    <div class="apta-modal-card">
+        <div class="apta-modal-header">
+            <span class="dashicons dashicons-shield text-danger modal-icon"></span>
+            <h3 id="apta-modal-title"><?php esc_html_e('Confirmar Acción', 'apta-shield'); ?></h3>
+        </div>
+        <div class="apta-modal-body">
+            <p id="apta-modal-message"></p>
+        </div>
+        <div class="apta-modal-footer">
+            <button type="button" class="apta-btn apta-btn-secondary" id="apta-modal-cancel"><?php esc_html_e('Cancelar', 'apta-shield'); ?></button>
+            <button type="button" class="apta-btn apta-btn-danger" id="apta-modal-confirm"><?php esc_html_e('Confirmar', 'apta-shield'); ?></button>
+        </div>
     </div>
 </div>

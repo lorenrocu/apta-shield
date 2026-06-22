@@ -63,16 +63,28 @@ defined('ABSPATH') || exit;
                             <th><?php esc_html_e('Archivo', 'apta-shield'); ?></th>
                             <th><?php esc_html_e('Tipo de Problema', 'apta-shield'); ?></th>
                             <th><?php esc_html_e('Descripción', 'apta-shield'); ?></th>
+                            <th><?php esc_html_e('Acciones', 'apta-shield'); ?></th>
                         </tr>
                     </thead>
                     <tbody id="apta-scan-tbody">
                         <?php 
                         if (!empty($last_scan['threats'])) {
-                            foreach ($last_scan['threats'] as $threat) {
-                                echo '<tr>';
+                            foreach ($last_scan['threats'] as $index => $threat) {
+                                echo '<tr id="apta-threat-row-' . esc_attr($index) . '">';
                                 echo '<td><code>' . esc_html($threat['file']) . '</code></td>';
                                 echo '<td><span class="badge badge-' . ($threat['type'] === 'malware' ? 'danger' : 'warning') . '">' . esc_html($threat['type_label']) . '</span></td>';
                                 echo '<td>' . esc_html($threat['desc']) . '</td>';
+                                echo '<td>';
+                                if ($threat['type'] === 'core_modified') {
+                                    echo '<span class="text-muted">' . esc_html__('Usa reinstalación', 'apta-shield') . '</span>';
+                                } else {
+                                    if (\AptaShield\Core\Plugin::is_pro_active()) {
+                                        echo '<button type="button" class="apta-btn apta-btn-danger apta-btn-sm apta-clean-threat-btn" data-index="' . esc_attr($index) . '">' . esc_html__('Limpiar', 'apta-shield') . '</button>';
+                                    } else {
+                                        echo '<span class="badge badge-warning">' . esc_html__('Pro Only', 'apta-shield') . '</span>';
+                                    }
+                                }
+                                echo '</td>';
                                 echo '</tr>';
                             }
                         }

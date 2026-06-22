@@ -38,6 +38,49 @@ class UrlObfuscator implements ModuleInterface {
     public function run() {
         add_action('init', [$this, 'gate_protected_urls'], 1);
         add_action('init', [$this, 'handle_secret_slug'], 2);
+
+        add_filter('login_url', [$this, 'filter_login_url'], 999, 3);
+        add_filter('register_url', [$this, 'filter_register_url'], 999, 1);
+        add_filter('site_url', [$this, 'filter_site_url'], 999, 4);
+        add_filter('network_site_url', [$this, 'filter_site_url'], 999, 4);
+    }
+
+    /**
+     * Filter the login URL to use the secret slug.
+     */
+    public function filter_login_url($login_url, $redirect, $force_reauth) {
+        $settings = Plugin::get_instance()->get_settings();
+        if (empty($settings['url_obfuscator_enabled']) || empty($settings['url_obfuscator_slug'])) {
+            return $login_url;
+        }
+        $secret_slug = trim($settings['url_obfuscator_slug'], '/');
+        return str_replace('wp-login.php', $secret_slug, $login_url);
+    }
+
+    /**
+     * Filter the register URL to use the secret slug.
+     */
+    public function filter_register_url($register_url) {
+        $settings = Plugin::get_instance()->get_settings();
+        if (empty($settings['url_obfuscator_enabled']) || empty($settings['url_obfuscator_slug'])) {
+            return $register_url;
+        }
+        $secret_slug = trim($settings['url_obfuscator_slug'], '/');
+        return str_replace('wp-login.php', $secret_slug, $register_url);
+    }
+
+    /**
+     * Filter the site/network site URL to redirect wp-login.php references to the secret slug.
+     */
+    public function filter_site_url($url, $path, $scheme, $blog_id = null) {
+        if ($path && strpos($path, 'wp-login.php') === 0) {
+            $settings = Plugin::get_instance()->get_settings();
+            if (!empty($settings['url_obfuscator_enabled']) && !empty($settings['url_obfuscator_slug'])) {
+                $secret_slug = trim($settings['url_obfuscator_slug'], '/');
+                $url = str_replace('wp-login.php', $secret_slug, $url);
+            }
+        }
+        return $url;
     }
 
     /**
@@ -129,47 +172,27 @@ class UrlObfuscator implements ModuleInterface {
         // PHP 8.x "undefined variable" notices on $user_login and
         // $error (which are then captured by our output buffer and
         // surfaced in the rendered HTML).
-        $predef_globals = [
-            'user_login'      => '',
-            'user_email'      => '',
-            'error'           => '',
-            'redirect_to'     => '',
-            'interim_login'   => false,
-            'rp_login'        => '',
-            'rp_key'          => '',
-            'customize_login' => false,
-            'secure_cookie'   => '',
-            'reauth'          => false,
-        ];
-        foreach ($predef_globals as $name => $default) {
-            if (!isset($GLOBALS[$name])) {
-                $GLOBALS[$name] = $default;
-            }
-        }
-
-        // Declare local references to the global variables. Since wp-login.php is required
-        // inside this method, it executes within this method's scope. Declaring these local
-        // variables as references to the globals ensures they are defined in this scope
-        // (preventing PHP 8.x undefined variable warnings) while keeping them fully synced
-        // with the global scope.
-        $user_login      = & $GLOBALS['user_login'];
-        $user_email      = & $GLOBALS['user_email'];
-        $error           = & $GLOBALS['error'];
-        $redirect_to     = & $GLOBALS['redirect_to'];
-        $interim_login   = & $GLOBALS['interim_login'];
-        $rp_login        = & $GLOBALS['rp_login'];
-        $rp_key          = & $GLOBALS['rp_key'];
-        $customize_login = & $GLOBALS['customize_login'];
-        $secure_cookie   = & $GLOBALS['secure_cookie'];
-        $reauth          = & $GLOBALS['reauth'];
+        // phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+        global $user_login, $user_email, $error, $redirect_to, $interim_login, $rp_login, $rp_key, $customize_login, $secure_cookie, $reauth;
+        if (!isset($user_login)) $user_login = '';
+        if (!isset($user_email)) $user_email = '';
+        if (!isset($error)) $error = '';
+        if (!isset($redirect_to)) $redirect_to = '';
+        if (!isset($interim_login)) $interim_login = false;
+        if (!isset($rp_login)) $rp_login = '';
+        if (!isset($rp_key)) $rp_key = '';
+        if (!isset($customize_login)) $customize_login = false;
+        if (!isset($secure_cookie)) $secure_cookie = '';
+        if (!isset($reauth)) $reauth = false;
+        // phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 
         // Trick wp-login.php into thinking it was loaded directly so
         // its own self-references resolve to the real wp-login.php
         // path before we rewrite them in the output buffer below.
         $_SERVER['SCRIPT_NAME'] = '/wp-login.php';
         $_SERVER['PHP_SELF']     = '/wp-login.php';
-        if (!empty($_SERVER['QUERY_STRING'])) {
-            $_SERVER['REQUEST_URI'] = '/wp-login.php?' . $_SERVER['QUERY_STRING'];
+        if (isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '') {
+            $_SERVER['REQUEST_URI'] = '/wp-login.php?' . esc_url_raw(wp_unslash($_SERVER['QUERY_STRING']));
         } else {
             $_SERVER['REQUEST_URI'] = '/wp-login.php';
         }
