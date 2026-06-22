@@ -24,18 +24,6 @@ class Signatures {
                 'desc'    => __('Detectada la familia Vapor Worker IO: un mu-plugin ofuscado que se carga automáticamente y mantiene persistencia.', 'apta-shield')
             ],
             [
-                'id'      => 'indexed_string_table_obfuscation',
-                'pattern' => '/function\s+[a-z_][a-z0-9_]*\s*\(\s*\$[a-z_][a-z0-9_]*\s*\)\s*\{\s*static\s+\$[a-z_][a-z0-9_]*\s*=\s*null\s*;.*?\$[a-z_][a-z0-9_]*\s*=\s*array\s*\(.*?return\s+\$[a-z_][a-z0-9_]*\s*\[\s*\$[a-z_][a-z0-9_]*\s*\]\s*;/is',
-                'label'   => __('Ofuscación mediante tabla de cadenas', 'apta-shield'),
-                'desc'    => __('Detectado un decodificador indexado de cadenas, una técnica usada para ocultar llamadas peligrosas en backdoors PHP.', 'apta-shield')
-            ],
-            [
-                'id'      => 'plugin_persistence_manipulation',
-                'pattern' => '/(?:get_option|update_option)\s*\(\s*[\'\"]active_plugins[\'\"]|SELECT\s+.*?option_value\s+FROM\s+.*?options.*?active_plugins/is',
-                'label'   => __('Manipulación de persistencia de plugins', 'apta-shield'),
-                'desc'    => __('Detectado código que lee o altera la lista de plugins activos, un comportamiento típico de malware persistente.', 'apta-shield')
-            ],
-            [
                 'id'      => 'eval_base64',
                 'pattern' => '/eval\s*\(\s*base64_decode\s*\(/i',
                 'label'   => __('Codificación sospechosa (base64)', 'apta-shield'),

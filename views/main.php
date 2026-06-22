@@ -18,6 +18,7 @@ if (!empty($settings['hardening_author_scan'])) $score += 10;
 
 // Check if a scan has run
 $last_scan = get_option('apta_shield_last_scan_result', null);
+$has_open_threats = $last_scan !== null && (!empty($last_scan['malware_count']) || !empty($last_scan['core_modified_count']));
 if ($last_scan !== null && empty($last_scan['malware_count']) && empty($last_scan['core_modified_count'])) {
     $score += 15;
 } elseif ($last_scan === null) {
@@ -49,9 +50,9 @@ $total_blocked = intval($total_blocked);
             <h1>Apta Shield <span class="apta-version">v<?php echo esc_html(APTA_SHIELD_VERSION); ?></span></h1>
         </div>
         <div class="apta-site-status">
-            <span class="apta-status-dot <?php echo $score >= 75 ? 'status-good' : 'status-warn'; ?>"></span>
-            <span class="apta-status-text">
-                <?php echo $score >= 75 ? esc_html__('Tu sitio está seguro', 'apta-shield') : esc_html__('Requiere atención', 'apta-shield'); ?>
+            <span id="apta-site-status-dot" class="apta-status-dot <?php echo !$has_open_threats && $score >= 75 ? 'status-good' : 'status-warn'; ?>"></span>
+            <span id="apta-site-status-text" class="apta-status-text">
+                <?php echo !$has_open_threats && $score >= 75 ? esc_html__('Tu sitio está seguro', 'apta-shield') : esc_html__('Requiere atención', 'apta-shield'); ?>
             </span>
         </div>
     </header>

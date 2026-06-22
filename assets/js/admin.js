@@ -260,6 +260,8 @@ jQuery(document).ready(function($) {
         $logs.html('<p class="log-info">[+] Iniciando análisis del sitio...</p>');
         $progress.css('width', '0%');
         $percent.text('0%');
+        $('#apta-site-status-dot').removeClass('status-good status-warn').addClass('status-warn');
+        $('#apta-site-status-text').text('Analizando seguridad...');
 
         $('#apta-scan-results-summary').addClass('hidden');
         $('#apta-scan-details-list').addClass('hidden');
@@ -322,6 +324,8 @@ jQuery(document).ready(function($) {
                     $summary.removeClass('hidden');
 
                     if (totalThreats > 0 && data.threats && data.threats.length) {
+                        $('#apta-site-status-dot').removeClass('status-good').addClass('status-warn');
+                        $('#apta-site-status-text').text('Requiere atención');
                         let tableHtml = '';
                         data.threats.forEach(function(threat, index) {
                             const badgeClass = threat.type === 'malware' ? 'danger' : 'warning';
@@ -346,6 +350,8 @@ jQuery(document).ready(function($) {
                         $details.removeClass('hidden');
                         showToast('El análisis ha completado. ¡Se detectaron amenazas!', 'error');
                     } else {
+                        $('#apta-site-status-dot').removeClass('status-warn').addClass('status-good');
+                        $('#apta-site-status-text').text('Tu sitio está seguro');
                         $tbody.html('');
                         $details.addClass('hidden');
                         showToast('El análisis ha completado de forma exitosa. Tu sitio está limpio.', 'success');

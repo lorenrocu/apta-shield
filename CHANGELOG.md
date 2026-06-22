@@ -1,8 +1,27 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to **Apta Shield** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.2] - 2026-06-22
+
+### Fixed
+- **Scanner False Positives**: Ignored core files that match official WordPress checksums. Modified heuristic signatures (removed false positives on active_plugins and string indexed table, restricted uploads directory check).
+- **Url Obfuscator**: Fixed redirection loop/error by redirecting to a front-end route instead of trying to load templates during premature hooks.
+- **Admin UI**: Main dashboard status indicator now correctly reflects if there are unresolved threat findings, and updates dynamically during manual scans.
+
+## [1.1.1] - 2026-06-19
+
+### Added
+- **Onboarding Setup Wizard**: Step-by-step guidance for new users.
+
+### Changed
+- **Visual Redesign**: Updated admin dashboard tabs and visual styling.
+
+### Fixed
+- **Url Obfuscator Warnings**: Resolved login warning bugs.
+- **Plugin Compliance**: Met standard WordPress.org plugin directory compliance requirements.
 
 ## [1.1.0] - 2026-06-17
 

@@ -49,10 +49,10 @@ class FileAnalyzer {
             $reasons[] = ['label' => 'Persistencia a nivel de servidor', 'desc' => 'Se detectó una directiva que puede inyectar código antes de cada petición o redirigir tráfico fuera del sitio.'];
         }
 
-        // PHP under uploads/cache is abnormal; combined with executable code is a strong signal.
+        // PHP under uploads/cache deserves review, but is not malware by itself.
         if ($is_php_payload && preg_match('#^wp-content/(uploads|cache|upgrade)/#', $normalized_path)) {
-            $score += 7;
-            $reasons[] = ['label' => 'PHP ejecutable en directorio de contenido', 'desc' => 'Se encontró código PHP en una ruta donde normalmente solo deberían existir archivos estáticos.'];
+            $score += 1;
+            $reasons[] = ['label' => 'PHP en directorio de contenido', 'desc' => 'La ruta merece revisión, pero no es una detección de malware por sí sola.'];
         }
 
         if ($is_php_payload && in_array($extension, ['phtml', 'pht', 'phar', 'php3', 'php4', 'php5', 'php7', 'php8'], true)) {
@@ -60,33 +60,30 @@ class FileAnalyzer {
             $reasons[] = ['label' => 'Extensión PHP alternativa', 'desc' => 'El archivo usa una extensión PHP alternativa, una técnica frecuente para evadir filtros de subida.'];
         }
 
-        $dangerous_execution = preg_match_all('/\b(?:eval|assert|system|exec|shell_exec|passthru|proc_open|popen)\s*\(/i', $content, $ignored);
-        $dynamic_input = preg_match_all('/\$_(?:GET|POST|REQUEST|COOKIE|FILES)\s*\[/i', $content, $ignored);
         $obfuscators = preg_match_all('/\b(?:base64_decode|gzinflate|gzdecode|str_rot13|rawurldecode|urldecode)\s*\(/i', $content, $ignored);
-        $file_mutation = preg_match_all('/\b(?:file_put_contents|fwrite|unlink|rename|copy|mkdir|chmod)\s*\(/i', $content, $ignored);
-        $remote_access = preg_match_all('/\b(?:curl_exec|fsockopen|stream_socket_client|wp_remote_(?:get|post|request))\s*\(/i', $content, $ignored);
+        $plugin_persistence = preg_match('/(?:get_option|update_option)\s*\(\s*[\'\"]active_plugins[\'\"]|SELECT\s+.*?option_value\s+FROM\s+.*?options.*?active_plugins/is', $content);
+        $direct_eval_payload = preg_match('/\b(?:eval|assert)\s*\(\s*(?:base64_decode|gzinflate|gzdecode|str_rot13|rawurldecode|urldecode|\$_(?:GET|POST|REQUEST|COOKIE))/i', $content);
+        $direct_command_input = preg_match('/\b(?:system|exec|shell_exec|passthru|proc_open|popen)\s*\([^;]{0,400}\$_(?:GET|POST|REQUEST|COOKIE)/is', $content);
+        $encoded_file_write = preg_match('/\b(?:file_put_contents|fwrite)\s*\([^;]{0,500}(?:base64_decode|gzinflate|gzdecode|\$_(?:GET|POST|REQUEST|COOKIE))/is', $content);
 
-        if ($dangerous_execution && ($dynamic_input || $obfuscators)) {
+        if ($direct_eval_payload || $direct_command_input) {
+            $score += 8;
+            $reasons[] = ['label' => 'Ejecución dinámica sospechosa', 'desc' => 'Se detectó ejecución directa de código o comandos a partir de entrada externa u ofuscación.'];
+        }
+        if ($obfuscators >= 3 && preg_match('/[A-Za-z0-9+\\/=_-]{600,}/', $content)) {
+            $score += 3;
+            $reasons[] = ['label' => 'Ofuscación encadenada', 'desc' => 'Se detectaron varias rutinas de codificación junto a un payload codificado extenso.'];
+        }
+        if ($encoded_file_write) {
             $score += 6;
-            $reasons[] = ['label' => 'Ejecución dinámica sospechosa', 'desc' => 'Combina ejecución de código/comandos con entrada externa u ofuscación.'];
+            $reasons[] = ['label' => 'Escritura de payload sospechosa', 'desc' => 'Se detectó la escritura de un archivo a partir de contenido codificado o controlado externamente.'];
         }
-        if ($obfuscators >= 2) {
+        // WordPress core and legitimate plugins read active_plugins normally.
+        // Treat it as suspicious only when it is coupled with an execution or
+        // obfuscation signal, never as an IOC on its own.
+        if ($plugin_persistence && ($direct_eval_payload || $direct_command_input || $encoded_file_write)) {
             $score += 3;
-            $reasons[] = ['label' => 'Ofuscación encadenada', 'desc' => 'Se detectaron varias rutinas de codificación o compresión en el mismo archivo.'];
-        }
-        if ($file_mutation && ($dangerous_execution || $obfuscators)) {
-            $score += 3;
-            $reasons[] = ['label' => 'Autopersistencia de archivos', 'desc' => 'El archivo puede modificar el sistema de archivos junto con ejecución u ofuscación.'];
-        }
-        if ($remote_access && ($dangerous_execution || $obfuscators)) {
-            $score += 2;
-            $reasons[] = ['label' => 'Canal remoto sospechoso', 'desc' => 'Combina acceso remoto con ejecución u ofuscación.'];
-        }
-
-        // Very long literals and a dense non-alphanumeric ratio are useful without attempting to decrypt anything.
-        if (preg_match('/[A-Za-z0-9+\\/=_-]{600,}/', $content) && $obfuscators) {
-            $score += 3;
-            $reasons[] = ['label' => 'Payload codificado extenso', 'desc' => 'Se encontró una cadena codificada extensa junto a funciones de decodificación.'];
+            $reasons[] = ['label' => 'Persistencia de plugins combinada', 'desc' => 'El archivo manipula plugins activos junto con ejecución, ofuscación o modificación de archivos.'];
         }
 
         if ($score < 7) {

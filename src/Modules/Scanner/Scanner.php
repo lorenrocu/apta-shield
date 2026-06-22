@@ -175,7 +175,10 @@ class Scanner implements ModuleInterface {
 
             // 2. Explainable local risk analysis. It combines IOCs and behaviour;
             // it never executes or attempts to decrypt untrusted code.
-            $finding = FileAnalyzer::analyse($file_path, $relative_path);
+            // A file listed by the official core checksum API is classified by
+            // integrity only. Core source legitimately contains low-level PHP
+            // primitives that would otherwise create heuristic false positives.
+            $finding = ($is_core_file && isset($checksums[$relative_path])) ? null : FileAnalyzer::analyse($file_path, $relative_path);
             if ($finding) {
                 $threats[] = [
                     'file'       => $relative_path,
@@ -508,7 +511,7 @@ class Scanner implements ModuleInterface {
                 }
             }
 
-            $finding = FileAnalyzer::analyse($file_path, $relative_path);
+            $finding = ($is_core_file && isset($checksums[$relative_path])) ? null : FileAnalyzer::analyse($file_path, $relative_path);
             if ($finding) {
                 $threats[] = [
                     'file'       => $relative_path,

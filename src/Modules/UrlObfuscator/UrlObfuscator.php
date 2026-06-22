@@ -285,24 +285,11 @@ class UrlObfuscator implements ModuleInterface {
      * Render the active theme's 404 template (or a plain wp_die fallback).
      */
     private function render_404() {
-        status_header(404);
-        nocache_headers();
-
-        global $wp_query;
-        if (is_object($wp_query)) {
-            $wp_query->set_404();
-        }
-
-        $template = get_query_template('404');
-        if ($template) {
-            include $template;
-        } else {
-            wp_die(
-                '<h1>Página no encontrada</h1><p>El enlace que has seguido no existe o ha cambiado.</p>',
-                '404 Not Found',
-                ['response' => 404]
-            );
-        }
+        // wp-admin reaches this code during init, before WordPress has run the
+        // front-end query and asset enqueue lifecycle. Redirecting to a route
+        // that does not exist lets WordPress render the active theme's normal,
+        // fully styled 404 page in a fresh front-end request.
+        wp_safe_redirect(home_url('/__apta-hidden-404__'), 302);
         exit;
     }
 }
