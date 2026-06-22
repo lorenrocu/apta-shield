@@ -16,7 +16,7 @@ class Signatures {
      * @return array
      */
     public static function get_signatures() {
-        return [
+        $signatures = [
             [
                 'id'      => 'vapor_worker_io_mu_backdoor',
                 'pattern' => '/Plugin\s+Name\s*:\s*Vapor\s+Worker\s+IO|Text\s+Domain\s*:\s*vapor-worker-io/i',
@@ -60,5 +60,12 @@ class Signatures {
                 'desc'    => __('Estructura sospechosa que intenta escribir un nuevo archivo .php decodificando base64.', 'apta-shield')
             ]
         ];
+
+        /**
+         * Pro may append signed, locally validated intelligence rules from
+         * Megapattern System. Free remains fully functional with its bundled
+         * rules and never downloads executable detection content.
+         */
+        return apply_filters('apta_shield_scanner_signatures', $signatures);
     }
 }
