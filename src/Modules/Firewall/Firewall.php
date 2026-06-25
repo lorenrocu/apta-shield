@@ -58,6 +58,7 @@ class Firewall implements ModuleInterface {
             'lfi'  => '/\.\.\/\.\.\/|wp-config\.php|etc\/passwd/i',
             'rce'  => '/system\(|exec\(|passthru\(|shell_exec\(|eval\(/i',
         ];
+        $patterns = apply_filters('apta_shield_firewall_patterns', $patterns);
 
         // Combine inputs to inspect.
         // We use wp_unslash to inspect raw inputs against regex patterns, but we sanitize them fully before logging.
@@ -68,6 +69,12 @@ class Firewall implements ModuleInterface {
             // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Inspecting raw QUERY_STRING for attack patterns.
             'GET' => isset($_SERVER['QUERY_STRING']) ? wp_unslash($_SERVER['QUERY_STRING']) : ''
         ];
+        // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Inspecting request headers for WAF rules.
+        $inputs['HEADERS'] = implode("\n", array_filter([
+            isset($_SERVER['HTTP_USER_AGENT']) ? wp_unslash($_SERVER['HTTP_USER_AGENT']) : '',
+            isset($_SERVER['HTTP_REFERER']) ? wp_unslash($_SERVER['HTTP_REFERER']) : '',
+            isset($_SERVER['HTTP_COOKIE']) ? wp_unslash($_SERVER['HTTP_COOKIE']) : '',
+        ]));
         
         // phpcs:ignore WordPress.Security.NonceVerification.Missing -- This is a WAF inspecting all POST requests globally, nonce verification does not apply.
         if (!empty($_POST)) {
@@ -78,7 +85,12 @@ class Firewall implements ModuleInterface {
         foreach ($inputs as $source => $value) {
             if (empty($value)) continue;
 
-            foreach ($patterns as $type => $pattern) {
+            foreach ($patterns as $type => $rule) {
+                $pattern = is_array($rule) ? ($rule['pattern'] ?? '') : $rule;
+                $target = is_array($rule) ? strtoupper((string) ($rule['target'] ?? '')) : '';
+                if (!$pattern || ($target && $target !== $source && !($target === 'URI' && $source === 'GET'))) {
+                    continue;
+                }
                 if (preg_match($pattern, $value)) {
                     $ip = IpResolver::get_client_ip();
 
@@ -87,6 +99,12 @@ class Firewall implements ModuleInterface {
                         'source' => $source,
                         'payload' => substr($value, 0, 500)
                     ]);
+
+                    // New cloud rules can be deployed in observation mode before
+                    // they block traffic, reducing the impact of false positives.
+                    if (is_array($rule) && ($rule['mode'] ?? 'block') === 'observe') {
+                        continue;
+                    }
 
                     // Trigger block
                     // translators: %s: Attack vector type detected by firewall (e.g. SQLI, XSS, etc.).

@@ -3,7 +3,7 @@
  * Plugin Name:       Apta Shield
  * Plugin URI:        https://github.com/lorenrocu/apta-shield
  * Description:       A comprehensive security solution for WordPress, including Malware Scanning, File Integrity Monitoring, WordPress Core Reinstallation, Firewall (WAF), Brute-Force Protection, and URL Obfuscation.
- * Version:           1.1.2
+ * Version:           1.1.3
  * Author:            Lorenzo Romero (megapattern)
  * Author URI:        https://lorenzoromero.net.pe
  * License:           GPL-2.0-or-later
@@ -13,7 +13,7 @@
 defined('ABSPATH') || exit;
 
 // Define plugin constants
-define('APTA_SHIELD_VERSION', '1.1.2');
+define('APTA_SHIELD_VERSION', '1.1.3');
 define('APTA_SHIELD_FILE', __FILE__);
 define('APTA_SHIELD_PATH', plugin_dir_path(__FILE__));
 define('APTA_SHIELD_URL', plugin_dir_url(__FILE__));
@@ -48,7 +48,8 @@ spl_autoload_register(function ($class) {
 // Initialize the plugin
 function apta_shield_bootstrap() {
     $plugin = AptaShield\Core\Plugin::get_instance();
-    $plugin->init();
+    // Hook the rest of initialization to plugins_loaded after other plugins are loaded (priority 10)
+    add_action('plugins_loaded', [$plugin, 'init'], 10);
 }
 
 // Bootstrap early or on plugins_loaded

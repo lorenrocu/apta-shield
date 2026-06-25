@@ -164,6 +164,7 @@ class Dashboard {
             'password_expiration'          => Plugin::is_pro_active() && isset($_POST['password_expiration']) ? (bool)$_POST['password_expiration'] : false,
             'captcha_on_comments'          => Plugin::is_pro_active() && isset($_POST['captcha_on_comments']) ? (bool)$_POST['captcha_on_comments'] : false,
             'captcha_on_woocommerce'       => Plugin::is_pro_active() && isset($_POST['captcha_on_woocommerce']) ? (bool)$_POST['captcha_on_woocommerce'] : false,
+            'captcha_on_elementor'         => Plugin::is_pro_active() && isset($_POST['captcha_on_elementor']) ? (bool)$_POST['captcha_on_elementor'] : false,
         ];
 
         // Ensure the slug is not empty or default wp-login/wp-admin

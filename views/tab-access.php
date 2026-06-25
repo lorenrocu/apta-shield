@@ -166,6 +166,13 @@ $is_pro_active = \AptaShield\Core\Plugin::is_pro_active();
                             <span class="apta-version" style="background-color: #ffe4e6; color: #be123c; border-color: #fecdd3; font-size: 9px; padding: 1px 4px;"><?php esc_html_e('PRO', 'apta-shield'); ?></span>
                         <?php endif; ?>
                     </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; <?php echo !$is_pro_active ? 'color: var(--apta-text-muted);' : ''; ?>">
+                        <input type="checkbox" name="captcha_on_elementor" value="1" <?php echo !$is_pro_active ? 'disabled' : ''; ?> <?php checked(1, !empty($settings['captcha_on_elementor'])); ?> class="settings-trigger">
+                        <?php esc_html_e('Formularios de Elementor', 'apta-shield'); ?>
+                        <?php if (!$is_pro_active) : ?>
+                            <span class="apta-version" style="background-color: #ffe4e6; color: #be123c; border-color: #fecdd3; font-size: 9px; padding: 1px 4px;"><?php esc_html_e('PRO', 'apta-shield'); ?></span>
+                        <?php endif; ?>
+                    </label>
                 </div>
             </div>
         </div>

@@ -4,6 +4,14 @@ All notable changes to **Apta Shield** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-06-24
+
+### Added
+- **Elementor Pro Forms CAPTCHA**: Integrated native CAPTCHA protection for Elementor Pro Forms with automatic jQuery frontend injection and server-side AJAX validation.
+
+### Fixed
+- **Pro Plugin Compatibility**: Adjusted module initialization order by delaying the free version startup to the `plugins_loaded` hook (priority 10). This resolves hook loading conflicts, unlocking premium PRO settings, 2FA configurations, and other pro integrations.
+
 ## [1.1.2] - 2026-06-22
 
 ### Fixed
